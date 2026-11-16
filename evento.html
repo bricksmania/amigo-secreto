@@ -7,11 +7,14 @@
   <style>
     * { box-sizing: border-box; }
     body { font-family: system-ui, sans-serif; max-width: 640px; margin: 2rem auto; padding: 0 1rem; color: #222; }
-    .unidade { display: block; width: 100%; text-align: left; padding: .8rem 1rem; margin: .5rem 0; font: inherit; font-size: 16px; min-height: 48px; overflow-wrap: anywhere; border: 1px solid #ccc; border-radius: 8px; background: #fff; cursor: pointer; }
-    .unidade:disabled { background: #eee; color: #888; cursor: not-allowed; }
-    .unidade.destaque { border: 2px solid #1b5e20; background: #f1f8f1; }
+    .pessoa { display: block; width: 100%; text-align: left; padding: .8rem 1rem; margin: .5rem 0; font: inherit; font-size: 16px; min-height: 48px; overflow-wrap: anywhere; border: 1px solid #ccc; border-radius: 8px; background: #fff; cursor: pointer; }
+    .pessoa.dependente { margin-left: 1.5rem; width: calc(100% - 1.5rem); font-size: 15px; }
+    .pessoa:disabled { background: #eee; color: #888; cursor: not-allowed; }
+    .pessoa.destaque { border: 2px solid #1b5e20; background: #f1f8f1; }
     .check { color: #1b5e20; font-weight: bold; display: block; margin-top: .3rem; }
+    .grupo { margin-top: 1rem; }
     .erro { color: #b00020; }
+    .ok { color: #1b5e20; }
     small { color: #555; }
     input { font: inherit; font-size: 16px; padding: .6rem; width: 100%; max-width: 100%; margin-top: .3rem; margin-bottom: .8rem; }
     button.principal { min-height: 44px; font: inherit; font-size: 16px; padding: .6rem 1.2rem; cursor: pointer; }
@@ -23,10 +26,11 @@
 </head>
 <body>
   <h1 id="titulo">Carregando...</h1>
-  <p>Cada unidade (você e seus dependentes, se for responsável) só pode ser escolhida uma vez. <strong>Guarde o link e o PIN</strong>: sem eles não é possível ver o resultado de novo.</p>
+  <p>Cada pessoa escolhe o próprio nome. Dependentes ficam logo abaixo do responsável. Todos da família usam o <strong>mesmo PIN</strong>. <strong>Guarde o PIN e o link de resultados</strong>.</p>
 
   <div id="lista"></div>
   <p id="msg" class="erro"></p>
+  <div id="sucesso" class="ok"></div>
 
   <!-- Passo 1: nome e PIN, na primeira vez que a pessoa entra -->
   <div id="entrada" class="overlay" style="display:none">
@@ -35,7 +39,7 @@
       <label>Seu nome (como está na lista)
         <input id="nomeEntrada" autocomplete="off">
       </label>
-      <label>Crie seu PIN de 4 dígitos
+      <label>PIN de 4 dígitos (o mesmo para toda a família)
         <input id="pinEntrada" inputmode="numeric" maxlength="4" type="password" autocomplete="off">
       </label>
       <label>Digite o PIN de novo
@@ -51,12 +55,11 @@
     <div class="modal" role="dialog" aria-modal="true" aria-labelledby="tituloTutorial">
       <h2 id="tituloTutorial">Como funciona</h2>
       <ol>
-        <li>Veja a lista de nomes. Quem já escolheu aparece com <strong>✔ já escolheu</strong>.</li>
-        <li>Toque no seu nome para confirmar. Se você for responsável, sua unidade já inclui seus dependentes.</li>
-        <li>Use o PIN que você criou para ver o resultado depois.</li>
-        <li>Abra o link que aparece e digite o PIN para ver com quem você tirou.</li>
+        <li>Veja a lista. Quem já escolheu aparece com <strong>✔ já escolheu</strong>.</li>
+        <li>Toque no seu nome. Depois, toque nos nomes dos seus dependentes, se tiver, usando o mesmo PIN.</li>
+        <li>Para ver o resultado, abra o link de resultados que aparece depois de escolher e digite o PIN.</li>
       </ol>
-      <p><small>Cada nome pode ser escolhido uma única vez. Ninguém consegue ver quem tirou quem, só o próprio resultado.</small></p>
+      <p><small>Cada pessoa só pode ser escolhida uma vez. Ninguém consegue ver quem tirou quem, só o próprio resultado.</small></p>
       <button id="btnEntendi" class="principal" type="button">Entendi</button>
     </div>
   </div>
@@ -64,10 +67,11 @@
   <script>
     const id = new URLSearchParams(location.search).get('id');
     const msg = document.getElementById('msg');
+    const sucesso = document.getElementById('sucesso');
     const CHAVE_ENTRADA = 'amigo-entrada-feita';
 
-    let dadosEntrada = null; // { unidadeId, nome, pin } — fica só nesta página
-    let evento = null;
+    let dadosEntrada = null; // { membro, pin } — só nesta página
+    let pessoas = [];
 
     function jaEntrou() {
       try { return !!localStorage.getItem(CHAVE_ENTRADA); } catch (e) { return false; }
@@ -77,80 +81,100 @@
       try { localStorage.setItem(CHAVE_ENTRADA, '1'); } catch (e) { /* sem armazenamento */ }
     }
 
-    function desenhar(ev) {
-      evento = ev;
-      document.getElementById('titulo').textContent = ev.titulo;
+    function desenhar(dados) {
+      pessoas = dados.pessoas;
+      document.getElementById('titulo').textContent = dados.titulo;
       const lista = document.getElementById('lista');
       lista.textContent = '';
 
-      const escolheram = ev.unidades.filter((u) => u.reservado).length;
+      const escolheram = pessoas.filter((p) => p.reservado).length;
       const resumo = document.createElement('p');
-      resumo.textContent = `${escolheram} de ${ev.unidades.length} já escolheram.`;
+      resumo.textContent = `${escolheram} de ${pessoas.length} já escolheram.`;
       lista.append(resumo);
 
-      for (const u of ev.unidades) {
-        const b = document.createElement('button');
-        b.className = 'unidade';
-        b.disabled = u.reservado;
-        b.textContent = u.nome + (u.dependentes ? ` (+ ${u.dependentes} dependente${u.dependentes > 1 ? 's' : ''})` : '');
-        if (u.reservado) {
-          const check = document.createElement('span');
-          check.className = 'check';
-          check.textContent = '✔ já escolheu';
-          b.append(check);
-        } else {
-          if (dadosEntrada && dadosEntrada.unidadeId === u.id) b.classList.add('destaque');
-          b.addEventListener('click', () => escolher(u));
+      // Agrupa: cada responsável seguido dos seus dependentes.
+      const grupos = new Map();
+      for (const p of pessoas) {
+        if (!grupos.has(p.grupo)) grupos.set(p.grupo, []);
+        grupos.get(p.grupo).push(p);
+      }
+
+      for (const membros of grupos.values()) {
+        const bloco = document.createElement('div');
+        bloco.className = 'grupo';
+        for (const p of membros) {
+          const b = document.createElement('button');
+          b.className = 'pessoa' + (p.dependente ? ' dependente' : '');
+          b.disabled = p.reservado;
+          b.textContent = (p.dependente ? '↳ ' : '') + p.nome;
+          if (p.reservado) {
+            const check = document.createElement('span');
+            check.className = 'check';
+            check.textContent = '✔ já escolheu';
+            b.append(check);
+          } else {
+            if (dadosEntrada && dadosEntrada.membro === p.id) b.classList.add('destaque');
+            b.addEventListener('click', () => escolher(p));
+          }
+          bloco.append(b);
         }
-        lista.append(b);
+        lista.append(bloco);
       }
     }
 
-    async function escolher(unidade) {
-      // Quem já informou nome e PIN só precisa confirmar a própria unidade.
-      if (dadosEntrada && dadosEntrada.unidadeId === unidade.id) {
-        if (!confirm(`Confirmar escolha de "${unidade.nome}"? Não será possível trocar.`)) return;
-        return reservar(unidade, dadosEntrada.pin);
-      }
+    async function escolher(pessoa) {
+      if (!confirm(`Confirmar escolha de "${pessoa.nome}"? Não será possível trocar.`)) return;
 
-      if (!confirm(`Confirmar escolha de "${unidade.nome}"? Não será possível trocar.`)) return;
-      const pin = prompt('Crie um PIN de 4 dígitos. Você vai precisar dele para ver seu resultado.');
-      if (pin === null) return;
-      if (!/^\d{4}$/.test(pin.trim())) {
-        alert('O PIN precisa ter exatamente 4 dígitos.');
-        return;
+      let pin;
+      if (dadosEntrada && dadosEntrada.membro === pessoa.id) {
+        pin = dadosEntrada.pin;
+      } else {
+        const digitado = prompt(
+          `Digite o PIN da família para escolher "${pessoa.nome}".\n(Se for a primeira escolha da família, crie um PIN de 4 dígitos.)`,
+        );
+        if (digitado === null) return;
+        pin = digitado.trim();
+        if (!/^\d{4}$/.test(pin)) {
+          alert('O PIN precisa ter exatamente 4 dígitos.');
+          return;
+        }
       }
-      const confirmacao = prompt('Digite o PIN novamente para confirmar.');
-      if (confirmacao === null) return;
-      if (confirmacao.trim() !== pin.trim()) {
-        alert('Os PINs não batem. Tente de novo.');
-        return;
-      }
-      return reservar(unidade, pin.trim());
+      return reservar(pessoa, pin);
     }
 
-    async function reservar(unidade, pin) {
+    async function reservar(pessoa, pin) {
       msg.textContent = '';
+      sucesso.textContent = '';
       const resp = await fetch('/api/pegar', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id, unidade: unidade.id, pin }),
+        body: JSON.stringify({ id, membro: pessoa.id, pin }),
       });
       const dados = await resp.json();
       if (!resp.ok) {
         msg.textContent = dados.erro;
+        if (dadosEntrada && dadosEntrada.membro === pessoa.id) dadosEntrada = null;
         carregar();
         return;
       }
-      location.href = 'revelar.html#t=' + dados.token;
+
+      dadosEntrada = null;
+      mostrarSucesso(dados.nome, dados.token);
+      carregar();
+    }
+
+    function mostrarSucesso(nome, token) {
+      sucesso.textContent = '';
+      const texto = document.createElement('p');
+      texto.textContent = `${nome} escolheu. Guarde este link para ver os resultados da família (com o PIN):`;
+      const a = document.createElement('a');
+      a.href = 'revelar.html#t=' + token;
+      a.textContent = location.origin + '/revelar.html#t=' + token;
+      a.style.wordBreak = 'break-all';
+      sucesso.append(texto, a);
     }
 
     // Passo 1: nome e PIN.
-    function abrirEntrada() {
-      document.getElementById('entrada').style.display = 'flex';
-      document.getElementById('nomeEntrada').focus();
-    }
-
     document.getElementById('btnContinuar').addEventListener('click', () => {
       const erro = document.getElementById('erroEntrada');
       erro.textContent = '';
@@ -158,13 +182,13 @@
       const pin = document.getElementById('pinEntrada').value.trim();
       const pin2 = document.getElementById('pinEntrada2').value.trim();
 
-      const unidade = evento && evento.unidades.find((u) => u.nome.trim().toLowerCase() === nome);
-      if (!unidade) {
-        erro.textContent = 'Esse nome não está na lista. Confira a escrita ou use o nome do responsável.';
+      const pessoa = pessoas.find((p) => p.nome.trim().toLowerCase() === nome);
+      if (!pessoa) {
+        erro.textContent = 'Esse nome não está na lista. Confira a escrita.';
         return;
       }
-      if (unidade.reservado) {
-        erro.textContent = 'Essa unidade já foi escolhida. Se foi você, use o link que recebeu antes.';
+      if (pessoa.reservado) {
+        erro.textContent = 'Essa pessoa já escolheu. Se foi você, use o link de resultados que recebeu antes.';
         return;
       }
       if (!/^\d{4}$/.test(pin)) {
@@ -176,7 +200,7 @@
         return;
       }
 
-      dadosEntrada = { unidadeId: unidade.id, pin };
+      dadosEntrada = { membro: pessoa.id, pin };
       document.getElementById('pinEntrada').value = '';
       document.getElementById('pinEntrada2').value = '';
       document.getElementById('entrada').style.display = 'none';
@@ -187,7 +211,7 @@
     document.getElementById('btnEntendi').addEventListener('click', () => {
       marcarEntrou();
       document.getElementById('tutorial').style.display = 'none';
-      desenhar(evento);
+      desenhar({ titulo: document.getElementById('titulo').textContent, pessoas });
       msg.textContent = 'Toque no seu nome (destacado em verde) para confirmar.';
     });
 
@@ -202,9 +226,11 @@
         msg.textContent = dados.erro;
         return;
       }
-      evento = dados;
       desenhar(dados);
-      if (!jaEntrou() && !dadosEntrada) abrirEntrada();
+      if (!jaEntrou() && !dadosEntrada) {
+        document.getElementById('entrada').style.display = 'flex';
+        document.getElementById('nomeEntrada').focus();
+      }
     }
 
     carregar();

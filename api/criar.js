@@ -30,9 +30,9 @@ export default async function handler(req, res) {
         .map(limpa)
         .filter(Boolean);
       unidades.push({ id: uid, nome, dependentes });
-      for (const n of [nome, ...dependentes]) {
-        givers.push({ id: `g${givers.length}`, nome: n, unidade: uid });
-      }
+      [nome, ...dependentes].forEach((n, k) => {
+        givers.push({ id: `g${givers.length}`, nome: n, unidade: uid, dependente: k > 0 });
+      });
     });
 
     if (givers.length < 2) throw new Error('É preciso pelo menos 2 participantes para sortear.');

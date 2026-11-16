@@ -3,95 +3,130 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Seu resultado</title>
+  <title>Resultados da família</title>
   <style>
     * { box-sizing: border-box; }
     body { font-family: system-ui, sans-serif; max-width: 640px; margin: 2rem auto; padding: 0 1rem; color: #222; }
-    button { min-height: 44px; font-size: 16px; }
-    input { font-size: 20px; max-width: 100%; }
-    td, th { overflow-wrap: anywhere; width: 50%; }
-    @media (max-width: 480px) { h1 { font-size: 1.4rem; } body { margin: 1rem auto; } td, th { padding: .5rem .3rem; } }
-    table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
-    td, th { text-align: left; padding: .6rem; border-bottom: 1px solid #ddd; }
-    button { padding: .6rem 1.2rem; font: inherit; cursor: pointer; margin-top: .5rem; }
-    input { font: inherit; padding: .5rem; font-size: 1.4rem; letter-spacing: .4rem; width: 9rem; text-align: center; }
+    button { min-height: 44px; font: inherit; font-size: 16px; padding: .6rem 1.2rem; cursor: pointer; margin: .3rem 0; }
+    .pessoa { display: block; width: 100%; text-align: left; padding: .8rem 1rem; margin: .5rem 0; border: 1px solid #ccc; border-radius: 8px; background: #fff; }
+    .pessoa.dependente { margin-left: 1.5rem; width: calc(100% - 1.5rem); }
+    .pessoa:disabled { background: #eee; color: #888; cursor: not-allowed; }
+    input { font: inherit; font-size: 20px; padding: .5rem; width: 9rem; max-width: 100%; letter-spacing: .4rem; text-align: center; }
     .erro { color: #b00020; }
+    .resultado { background: #f1f8f1; border-radius: 10px; padding: 1rem; margin-top: 1rem; }
+    .resultado strong { font-size: 1.2rem; }
     small { color: #555; }
-    #formulario { margin-top: 1.5rem; }
+    #lista { display: none; margin-top: 1rem; }
     #resultado { display: none; }
+    @media (max-width: 480px) { h1 { font-size: 1.4rem; } }
   </style>
 </head>
 <body>
-  <h1 id="titulo">Seu resultado</h1>
-  <p><small>Digite o PIN de 4 dígitos que você criou ao escolher sua unidade.</small></p>
+  <h1 id="titulo">Resultados da família</h1>
+  <p><small>Digite o PIN da família. Depois, escolha a pessoa para ver o resultado dela. Guarde esta página nos favoritos.</small></p>
 
   <div id="formulario">
-    <label>PIN<br>
-      <input id="pin" inputmode="numeric" autocomplete="off" maxlength="4" type="password">
+    <label>PIN de 4 dígitos<br>
+      <input id="pin" inputmode="numeric" maxlength="4" type="password" autocomplete="off">
     </label><br>
-    <button id="btnVer">Ver resultado</button>
+    <button id="btnEntrar" class="principal" type="button">Ver família</button>
   </div>
 
   <p id="msg" class="erro"></p>
 
+  <div id="lista"></div>
+
   <div id="resultado">
-    <div id="res"></div>
+    <div class="resultado" id="caixa"></div>
+    <button id="btnVoltar" type="button">Voltar à lista</button>
   </div>
 
   <script>
     const token = new URLSearchParams(location.hash.slice(1)).get('t');
     const $ = (id) => document.getElementById(id);
     const msg = $('msg');
+    let pinAtual = null;
 
-    async function ver() {
-      msg.textContent = '';
-      const pin = $('pin').value.trim();
-      $('btnVer').disabled = true;
+    async function api(corpo) {
       const resp = await fetch('/api/revelar', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token, pin }),
+        body: JSON.stringify({ token, ...corpo }),
       });
-      $('btnVer').disabled = false;
-      const dados = await resp.json();
-      if (!resp.ok) {
+      return { ok: resp.ok, dados: await resp.json() };
+    }
+
+    async function entrar() {
+      msg.textContent = '';
+      const pin = $('pin').value.trim();
+      $('btnEntrar').disabled = true;
+      const { ok, dados } = await api({ pin });
+      $('btnEntrar').disabled = false;
+      if (!ok) {
         msg.textContent = dados.erro;
         $('pin').value = '';
         return;
       }
-
+      pinAtual = pin;
       $('formulario').style.display = 'none';
       $('titulo').textContent = dados.titulo + ' — ' + dados.unidade;
+      desenharLista(dados.membros);
+    }
 
-      const tabela = document.createElement('table');
-      const cab = document.createElement('tr');
-      for (const t of ['Quem', 'Tirou']) {
-        const th = document.createElement('th');
-        th.textContent = t;
-        cab.append(th);
-      }
-      tabela.append(cab);
+    function desenharLista(membros) {
+      const lista = $('lista');
+      lista.textContent = '';
+      $('resultado').style.display = 'none';
+      lista.style.display = 'block';
 
-      for (const r of dados.resultados) {
-        const tr = document.createElement('tr');
-        const td1 = document.createElement('td');
-        td1.textContent = r.quem;
-        const td2 = document.createElement('td');
-        td2.textContent = r.tirou;
-        tr.append(td1, td2);
-        tabela.append(tr);
+      const titulo = document.createElement('p');
+      titulo.textContent = 'Toque em uma pessoa para ver o resultado dela:';
+      lista.append(titulo);
+
+      for (const m of membros) {
+        const b = document.createElement('button');
+        b.className = 'pessoa' + (m.dependente ? ' dependente' : '');
+        b.textContent = (m.dependente ? '↳ ' : '') + m.nome + (m.escolheu ? '' : ' (ainda não escolheu)');
+        b.disabled = !m.escolheu;
+        if (m.escolheu) b.addEventListener('click', () => ver(m));
+        lista.append(b);
       }
-      $('res').textContent = '';
-      $('res').append(tabela);
+    }
+
+    async function ver(membro) {
+      msg.textContent = '';
+      const { ok, dados } = await api({ pin: pinAtual, membro: membro.id });
+      if (!ok) {
+        msg.textContent = dados.erro;
+        return;
+      }
+      $('lista').style.display = 'none';
+      const caixa = $('caixa');
+      caixa.textContent = '';
+      const quem = document.createElement('p');
+      quem.textContent = dados.quem;
+      const tirou = document.createElement('p');
+      tirou.append('Tirou: ');
+      const forte = document.createElement('strong');
+      forte.textContent = dados.tirou;
+      tirou.append(forte);
+      caixa.append(quem, tirou);
       $('resultado').style.display = 'block';
     }
+
+    $('btnVoltar').addEventListener('click', async () => {
+      msg.textContent = '';
+      const { ok, dados } = await api({ pin: pinAtual });
+      if (ok) desenharLista(dados.membros);
+      else msg.textContent = dados.erro;
+    });
 
     if (!token) {
       msg.textContent = 'Link incompleto.';
       $('formulario').style.display = 'none';
     }
-    $('btnVer').addEventListener('click', ver);
-    $('pin').addEventListener('keydown', (e) => { if (e.key === 'Enter') ver(); });
+    $('btnEntrar').addEventListener('click', entrar);
+    $('pin').addEventListener('keydown', (e) => { if (e.key === 'Enter') entrar(); });
   </script>
 </body>
 </html>

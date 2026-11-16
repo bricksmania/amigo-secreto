@@ -1,7 +1,7 @@
 import { cmd } from '../lib/redis.js';
 
 // GET /api/evento?id=...
-// Mostra só as unidades e se já foram escolhidas. Nunca mostra quem escolheu nem o resultado.
+// Lista cada pessoa (responsável e dependentes) e se já escolheu. Nunca mostra resultados.
 export default async function handler(req, res) {
   if (req.method !== 'GET') return res.status(405).json({ erro: 'Método não permitido.' });
 
@@ -11,14 +11,17 @@ export default async function handler(req, res) {
     if (!raw) return res.status(404).json({ erro: 'Evento não encontrado.' });
 
     const ev = JSON.parse(raw);
-    const travas = await cmd('MGET', ...ev.unidades.map((u) => `lock:${id}:${u.id}`));
+    const travas = await cmd('MGET', ...ev.givers.map((g) => `lock:${id}:${g.id}`));
+    const responsavelDe = new Map(ev.unidades.map((u) => [u.id, u.nome]));
 
     res.json({
       titulo: ev.titulo,
-      unidades: ev.unidades.map((u, i) => ({
-        id: u.id,
-        nome: u.nome,
-        dependentes: u.dependentes.length,
+      pessoas: ev.givers.map((g, i) => ({
+        id: g.id,
+        nome: g.nome,
+        grupo: g.unidade,
+        dependente: !!g.dependente,
+        responsavel: g.dependente ? responsavelDe.get(g.unidade) : null,
         reservado: travas[i] !== null,
       })),
     });

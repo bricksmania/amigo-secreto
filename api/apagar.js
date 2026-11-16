@@ -19,14 +19,20 @@ export default async function handler(req, res) {
       return res.status(401).json({ erro: 'Chave inválida para apagar este sorteio.' });
     }
 
-    const travas = ev.unidades.map((u) => `lock:${id}:${u.id}`);
-    const valores = travas.length ? await cmd('MGET', ...travas) : [];
-
-    const apagar = [...travas, `ev:${id}`];
-    for (const token of valores) {
-      if (token) apagar.push(`tok:${token}`, `pin:${token}`, `erros:${token}`, `bloq:${token}`);
+    const apagar = ev.givers.map((g) => `lock:${id}:${g.id}`);
+    const unidades = ev.unidades.map((u) => u.id);
+    for (const uid of unidades) {
+      apagar.push(`pinf:${id}:${uid}`, `famtok:${id}:${uid}`, `bloqp:${id}:${uid}`, `errosp:${id}:${uid}`);
     }
 
+    const tokens = unidades.length
+      ? await cmd('MGET', ...unidades.map((uid) => `famtok:${id}:${uid}`))
+      : [];
+    for (const token of tokens) {
+      if (token) apagar.push(`tok:${token}`, `erros:${token}`, `bloq:${token}`);
+    }
+
+    apagar.push(`ev:${id}`);
     for (let i = 0; i < apagar.length; i += 500) {
       await cmd('DEL', ...apagar.slice(i, i + 500));
     }
