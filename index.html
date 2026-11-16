@@ -5,7 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Criar amigo secreto</title>
   <style>
+    * { box-sizing: border-box; }
     body { font-family: system-ui, sans-serif; max-width: 640px; margin: 2rem auto; padding: 0 1rem; color: #222; }
+    button { min-height: 44px; font-size: 16px; }
+    input, textarea { font-size: 16px; max-width: 100%; }
+    .box, .box a { overflow-wrap: anywhere; word-break: break-word; }
+    @media (max-width: 480px) { h1 { font-size: 1.5rem; } body { margin: 1rem auto; } }
     textarea { width: 100%; min-height: 140px; font: inherit; box-sizing: border-box; }
     input { width: 100%; font: inherit; padding: .4rem; box-sizing: border-box; }
     label { display: block; margin-bottom: 1rem; }
@@ -55,6 +60,28 @@
     function gravarLocal(lista) {
       localStorage.setItem(CHAVE, JSON.stringify(lista));
     }
+    async function apagarSorteio(item) {
+      const ok = confirm(`Apagar o sorteio "${item.titulo}"?\n\nOs participantes perdem o acesso e isso não pode ser desfeito.`);
+      if (!ok) return;
+      try {
+        const resp = await fetch('/api/apagar', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: item.id, chave: item.chave }),
+        });
+        const dados = await resp.json().catch(() => ({}));
+        if (!resp.ok && resp.status !== 404) {
+          alert(dados.erro || 'Não foi possível apagar. Tente de novo.');
+          return;
+        }
+      } catch (err) {
+        alert('Erro de conexão. Tente de novo.');
+        return;
+      }
+      gravarLocal(lerLocal().filter((x) => x.link !== item.link));
+      desenharLista();
+    }
+
     function desenharLista() {
       const area = document.getElementById('meus');
       const lista = lerLocal();
@@ -73,11 +100,14 @@
         data.textContent = ' — ' + new Date(item.criado).toLocaleString('pt-BR');
         const remover = document.createElement('button');
         remover.type = 'button';
-        remover.textContent = 'Tirar da lista';
+        remover.textContent = item.chave ? 'Apagar sorteio' : 'Tirar da lista';
         remover.style.marginLeft = '.5rem';
         remover.addEventListener('click', () => {
-          gravarLocal(lerLocal().filter((x) => x.link !== item.link));
-          desenharLista();
+          if (item.chave) apagarSorteio(item);
+          else {
+            gravarLocal(lerLocal().filter((x) => x.link !== item.link));
+            desenharLista();
+          }
         });
         linha.append(a, data, remover);
         area.append(linha);
@@ -127,7 +157,10 @@
 
         const link = location.origin + dados.link;
         const titulo = document.getElementById('titulo').value.trim();
-        gravarLocal([{ titulo, link, criado: Date.now() }, ...lerLocal()]);
+        gravarLocal([
+          { titulo, link, criado: Date.now(), id: dados.id, chave: dados.chaveApagar },
+          ...lerLocal(),
+        ]);
         desenharLista();
         saida.textContent = '';
 

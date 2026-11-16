@@ -1,6 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import { cmd } from '../lib/redis.js';
 import { sortear } from '../lib/sorteio.js';
+import { hashCodigo } from '../lib/codigo.js';
 
 const limpa = (s) => String(s ?? '').replace(/\s+/g, ' ').trim().slice(0, 80);
 
@@ -61,9 +62,22 @@ export default async function handler(req, res) {
     }
 
     const id = randomBytes(6).toString('base64url');
-    await cmd('SET', `ev:${id}`, JSON.stringify({ titulo, unidades, givers, pares: sorteio }));
+    // Chave para apagar o sorteio: fica só no aparelho de quem criou. O servidor guarda só o hash.
+    const chaveApagar = randomBytes(16).toString('base64url');
 
-    res.status(201).json({ id, link: `/evento.html?id=${id}` });
+    await cmd(
+      'SET',
+      `ev:${id}`,
+      JSON.stringify({
+        titulo,
+        unidades,
+        givers,
+        pares: sorteio,
+        apagarHash: hashCodigo(id, chaveApagar),
+      }),
+    );
+
+    res.status(201).json({ id, link: `/evento.html?id=${id}`, chaveApagar });
   } catch (e) {
     res.status(400).json({ erro: e.message });
   }
