@@ -7,84 +7,90 @@
   <style>
     * { box-sizing: border-box; }
     body { font-family: system-ui, sans-serif; max-width: 640px; margin: 2rem auto; padding: 0 1rem; color: #222; }
+    button { min-height: 44px; font: inherit; font-size: 16px; padding: .6rem 1.2rem; cursor: pointer; }
     .pessoa { display: block; width: 100%; text-align: left; padding: .8rem 1rem; margin: .5rem 0; font: inherit; font-size: 16px; min-height: 48px; overflow-wrap: anywhere; border: 1px solid #ccc; border-radius: 8px; background: #fff; cursor: pointer; }
     .pessoa.dependente { margin-left: 1.5rem; width: calc(100% - 1.5rem); font-size: 15px; }
-    .pessoa:disabled { background: #eee; color: #888; cursor: not-allowed; }
-    .pessoa.destaque { border: 2px solid #1b5e20; background: #f1f8f1; }
-    .check { color: #1b5e20; font-weight: bold; display: block; margin-top: .3rem; }
+    .pessoa.escolhida { background: #f2f2f2; border-color: #bbb; }
+    .check { color: #1b5e20; font-weight: bold; display: block; margin-top: .3rem; font-size: 14px; }
     .grupo { margin-top: 1rem; }
     .erro { color: #b00020; }
-    .ok { color: #1b5e20; }
     small { color: #555; }
-    input { font: inherit; font-size: 16px; padding: .6rem; width: 100%; max-width: 100%; margin-top: .3rem; margin-bottom: .8rem; }
-    button.principal { min-height: 44px; font: inherit; font-size: 16px; padding: .6rem 1.2rem; cursor: pointer; }
-    .overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, .55); display: flex; align-items: center; justify-content: center; padding: 1rem; z-index: 10; }
-    .modal { background: #fff; padding: 1.2rem 1.3rem; border-radius: 12px; max-width: 420px; width: 100%; max-height: 90vh; overflow: auto; }
-    .modal ol { padding-left: 1.2rem; line-height: 1.5; }
+    input { font: inherit; font-size: 20px; padding: .5rem; width: 9rem; max-width: 100%; letter-spacing: .4rem; text-align: center; }
+    label { display: block; margin-bottom: .8rem; }
+    .resultado { background: #f1f8f1; border-radius: 10px; padding: 1rem 1.2rem; margin-top: 1rem; }
+    .resultado .tirou { font-size: 1.3rem; font-weight: bold; color: #1b5e20; }
+    #tela { display: none; }
     @media (max-width: 480px) { h1 { font-size: 1.5rem; } body { margin: 1rem auto; } }
   </style>
 </head>
 <body>
   <h1 id="titulo">Carregando...</h1>
-  <p>Cada pessoa escolhe o próprio nome. Dependentes ficam logo abaixo do responsável. Todos da família usam o <strong>mesmo PIN</strong>. <strong>Guarde o PIN e o link de resultados</strong>.</p>
 
-  <div id="lista"></div>
-  <p id="msg" class="erro"></p>
-  <div id="sucesso" class="ok"></div>
-
-  <!-- Passo 1: nome e PIN, na primeira vez que a pessoa entra -->
-  <div id="entrada" class="overlay" style="display:none">
-    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="tituloEntrada">
-      <h2 id="tituloEntrada">Bem-vindo</h2>
-      <label>Seu nome (como está na lista)
-        <input id="nomeEntrada" autocomplete="off">
-      </label>
-      <label>PIN de 4 dígitos (o mesmo para toda a família)
-        <input id="pinEntrada" inputmode="numeric" maxlength="4" type="password" autocomplete="off">
-      </label>
-      <label>Digite o PIN de novo
-        <input id="pinEntrada2" inputmode="numeric" maxlength="4" type="password" autocomplete="off">
-      </label>
-      <p id="erroEntrada" class="erro"></p>
-      <button id="btnContinuar" class="principal" type="button">Continuar</button>
-    </div>
+  <!-- Lista de nomes -->
+  <div id="areaLista">
+    <p>Toque no seu nome. Na primeira vez, você cria um PIN. Depois, para ver o resultado, toque no seu nome de novo e digite o PIN.</p>
+    <p><small>Quem tem dependentes: os dependentes aparecem logo abaixo do responsável e usam o mesmo PIN da família.</small></p>
+    <div id="lista"></div>
+    <p id="msg" class="erro"></p>
   </div>
 
-  <!-- Passo 2: como funciona -->
-  <div id="tutorial" class="overlay" style="display:none">
-    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="tituloTutorial">
-      <h2 id="tituloTutorial">Como funciona</h2>
-      <ol>
-        <li>Veja a lista. Quem já escolheu aparece com <strong>✔ já escolheu</strong>.</li>
-        <li>Toque no seu nome. Depois, toque nos nomes dos seus dependentes, se tiver, usando o mesmo PIN.</li>
-        <li>Para ver o resultado, abra o link de resultados que aparece depois de escolher e digite o PIN.</li>
-      </ol>
-      <p><small>Cada pessoa só pode ser escolhida uma vez. Ninguém consegue ver quem tirou quem, só o próprio resultado.</small></p>
-      <button id="btnEntendi" class="principal" type="button">Entendi</button>
+  <!-- PIN e resultado, dentro da página -->
+  <div id="tela">
+    <h2 id="telaNome"></h2>
+    <div id="telaPin">
+      <label id="telaPinRotulo">Digite seu PIN
+        <br><input id="pinVer" inputmode="numeric" maxlength="4" type="password" autocomplete="off">
+      </label>
+      <button id="btnVer" type="button">Ver resultado</button>
+      <p id="erroVer" class="erro"></p>
     </div>
+    <div id="telaResultado" style="display:none">
+      <div class="resultado">
+        <p id="resQuem"></p>
+        <p class="tirou" id="resTirou"></p>
+      </div>
+      <p><small>Você só vê o seu resultado. Ninguém consegue ver o resultado de outra pessoa.</small></p>
+    </div>
+    <p><button id="btnVoltar" type="button">Voltar à lista</button></p>
   </div>
 
   <script>
     const id = new URLSearchParams(location.search).get('id');
     const msg = document.getElementById('msg');
-    const sucesso = document.getElementById('sucesso');
-    const CHAVE_ENTRADA = 'amigo-entrada-feita';
+    const $ = (x) => document.getElementById(x);
 
-    let dadosEntrada = null; // { membro, pin } — só nesta página
     let pessoas = [];
+    let tituloEvento = '';
 
-    function jaEntrou() {
-      try { return !!localStorage.getItem(CHAVE_ENTRADA); } catch (e) { return false; }
+    function mostrarLista() {
+      $('tela').style.display = 'none';
+      $('areaLista').style.display = 'block';
+      $('erroVer').textContent = '';
+      $('pinVer').value = '';
+      carregar();
     }
 
-    function marcarEntrou() {
-      try { localStorage.setItem(CHAVE_ENTRADA, '1'); } catch (e) { /* sem armazenamento */ }
+    function mostrarTela(nome) {
+      $('areaLista').style.display = 'none';
+      $('tela').style.display = 'block';
+      $('telaNome').textContent = nome;
+      $('telaResultado').style.display = 'none';
+      $('telaPin').style.display = 'block';
+      $('erroVer').textContent = '';
+      $('pinVer').value = '';
+      window.scrollTo(0, 0);
     }
 
-    function desenhar(dados) {
-      pessoas = dados.pessoas;
-      document.getElementById('titulo').textContent = dados.titulo;
-      const lista = document.getElementById('lista');
+    function mostrarResultado(nome, tirou) {
+      $('telaPin').style.display = 'none';
+      $('telaResultado').style.display = 'block';
+      $('resQuem').textContent = `${nome}, você tirou:`;
+      $('resTirou').textContent = tirou;
+    }
+
+    function desenhar() {
+      $('titulo').textContent = tituloEvento;
+      const lista = $('lista');
       lista.textContent = '';
 
       const escolheram = pessoas.filter((p) => p.reservado).length;
@@ -92,7 +98,6 @@
       resumo.textContent = `${escolheram} de ${pessoas.length} já escolheram.`;
       lista.append(resumo);
 
-      // Agrupa: cada responsável seguido dos seus dependentes.
       const grupos = new Map();
       for (const p of pessoas) {
         if (!grupos.has(p.grupo)) grupos.set(p.grupo, []);
@@ -104,16 +109,15 @@
         bloco.className = 'grupo';
         for (const p of membros) {
           const b = document.createElement('button');
-          b.className = 'pessoa' + (p.dependente ? ' dependente' : '');
-          b.disabled = p.reservado;
+          b.className = 'pessoa' + (p.dependente ? ' dependente' : '') + (p.reservado ? ' escolhida' : '');
           b.textContent = (p.dependente ? '↳ ' : '') + p.nome;
           if (p.reservado) {
             const check = document.createElement('span');
             check.className = 'check';
-            check.textContent = '✔ já escolheu';
+            check.textContent = '✔ já escolheu · toque para ver o resultado';
             b.append(check);
+            b.addEventListener('click', () => abrirVer(p));
           } else {
-            if (dadosEntrada && dadosEntrada.membro === p.id) b.classList.add('destaque');
             b.addEventListener('click', () => escolher(p));
           }
           bloco.append(b);
@@ -122,29 +126,34 @@
       }
     }
 
+    // Toque em quem ainda não escolheu: confirma e cria (ou digita) o PIN.
     async function escolher(pessoa) {
       if (!confirm(`Confirmar escolha de "${pessoa.nome}"? Não será possível trocar.`)) return;
 
       let pin;
-      if (dadosEntrada && dadosEntrada.membro === pessoa.id) {
-        pin = dadosEntrada.pin;
-      } else {
-        const digitado = prompt(
-          `Digite o PIN da família para escolher "${pessoa.nome}".\n(Se for a primeira escolha da família, crie um PIN de 4 dígitos.)`,
-        );
+      if (pessoa.temPin) {
+        const rotulo = pessoa.familia ? 'o PIN da família' : 'o seu PIN';
+        const digitado = prompt(`Digite ${rotulo} para escolher "${pessoa.nome}".`);
         if (digitado === null) return;
         pin = digitado.trim();
-        if (!/^\d{4}$/.test(pin)) {
-          alert('O PIN precisa ter exatamente 4 dígitos.');
-          return;
-        }
+        if (!/^\d{4}$/.test(pin)) return alert('O PIN precisa ter exatamente 4 dígitos.');
+      } else {
+        const rotulo = pessoa.familia
+          ? 'Crie o PIN da família (4 dígitos). Os outros da família usarão este mesmo PIN.'
+          : 'Crie seu PIN de 4 dígitos.';
+        const criado = prompt(rotulo);
+        if (criado === null) return;
+        pin = criado.trim();
+        if (!/^\d{4}$/.test(pin)) return alert('O PIN precisa ter exatamente 4 dígitos.');
+        const repetido = prompt('Digite o PIN de novo para confirmar.');
+        if (repetido === null) return;
+        if (repetido.trim() !== pin) return alert('Os PINs não batem. Tente de novo.');
       }
-      return reservar(pessoa, pin);
+      await reservar(pessoa, pin);
     }
 
     async function reservar(pessoa, pin) {
       msg.textContent = '';
-      sucesso.textContent = '';
       const resp = await fetch('/api/pegar', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -153,71 +162,52 @@
       const dados = await resp.json();
       if (!resp.ok) {
         msg.textContent = dados.erro;
-        if (dadosEntrada && dadosEntrada.membro === pessoa.id) dadosEntrada = null;
-        carregar();
+        await carregar();
         return;
       }
-
-      dadosEntrada = null;
-      mostrarSucesso(dados.nome, dados.token);
-      carregar();
+      await abrirResultadoComPin(pessoa, pin);
     }
 
-    function mostrarSucesso(nome, token) {
-      sucesso.textContent = '';
-      const texto = document.createElement('p');
-      texto.textContent = `${nome} escolheu. Guarde este link para ver os resultados da família (com o PIN):`;
-      const a = document.createElement('a');
-      a.href = 'revelar.html#t=' + token;
-      a.textContent = location.origin + '/revelar.html#t=' + token;
-      a.style.wordBreak = 'break-all';
-      sucesso.append(texto, a);
+    // Toque em quem já escolheu: abre a tela para digitar o PIN.
+    function abrirVer(pessoa) {
+      mostrarTela(pessoa.nome);
+      $('telaPinRotulo').firstChild.textContent = pessoa.familia
+        ? `Digite o PIN da família para ver o resultado de ${pessoa.nome}`
+        : 'Digite seu PIN para ver seu resultado';
+      $('btnVer').onclick = () => verComPin(pessoa, $('pinVer').value.trim());
+      $('pinVer').focus();
     }
 
-    // Passo 1: nome e PIN.
-    document.getElementById('btnContinuar').addEventListener('click', () => {
-      const erro = document.getElementById('erroEntrada');
-      erro.textContent = '';
-      const nome = document.getElementById('nomeEntrada').value.trim().toLowerCase();
-      const pin = document.getElementById('pinEntrada').value.trim();
-      const pin2 = document.getElementById('pinEntrada2').value.trim();
-
-      const pessoa = pessoas.find((p) => p.nome.trim().toLowerCase() === nome);
-      if (!pessoa) {
-        erro.textContent = 'Esse nome não está na lista. Confira a escrita.';
-        return;
-      }
-      if (pessoa.reservado) {
-        erro.textContent = 'Essa pessoa já escolheu. Se foi você, use o link de resultados que recebeu antes.';
-        return;
-      }
+    async function verComPin(pessoa, pin) {
+      $('erroVer').textContent = '';
       if (!/^\d{4}$/.test(pin)) {
-        erro.textContent = 'O PIN precisa ter exatamente 4 dígitos.';
+        $('erroVer').textContent = 'Informe o PIN de 4 dígitos.';
         return;
       }
-      if (pin !== pin2) {
-        erro.textContent = 'Os PINs não batem.';
+      await abrirResultadoComPin(pessoa, pin);
+    }
+
+    async function abrirResultadoComPin(pessoa, pin) {
+      mostrarTela(pessoa.nome);
+      const resp = await fetch('/api/ver', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, membro: pessoa.id, pin }),
+      });
+      const dados = await resp.json();
+      if (!resp.ok) {
+        $('erroVer').textContent = dados.erro;
+        $('pinVer').value = '';
         return;
       }
+      mostrarResultado(pessoa.nome, dados.tirou);
+    }
 
-      dadosEntrada = { membro: pessoa.id, pin };
-      document.getElementById('pinEntrada').value = '';
-      document.getElementById('pinEntrada2').value = '';
-      document.getElementById('entrada').style.display = 'none';
-      document.getElementById('tutorial').style.display = 'flex';
-    });
-
-    // Passo 2: como funciona.
-    document.getElementById('btnEntendi').addEventListener('click', () => {
-      marcarEntrou();
-      document.getElementById('tutorial').style.display = 'none';
-      desenhar({ titulo: document.getElementById('titulo').textContent, pessoas });
-      msg.textContent = 'Toque no seu nome (destacado em verde) para confirmar.';
-    });
+    $('btnVoltar').addEventListener('click', mostrarLista);
 
     async function carregar() {
       if (!id) {
-        msg.textContent = 'Link sem identificação do evento.';
+        msg.textContent = 'Link sem identificação do sorteio.';
         return;
       }
       const resp = await fetch('/api/evento?id=' + encodeURIComponent(id));
@@ -226,11 +216,9 @@
         msg.textContent = dados.erro;
         return;
       }
-      desenhar(dados);
-      if (!jaEntrou() && !dadosEntrada) {
-        document.getElementById('entrada').style.display = 'flex';
-        document.getElementById('nomeEntrada').focus();
-      }
+      tituloEvento = dados.titulo;
+      pessoas = dados.pessoas;
+      desenhar();
     }
 
     carregar();
