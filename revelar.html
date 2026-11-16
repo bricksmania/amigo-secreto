@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Seu resultado</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 640px; margin: 2rem auto; padding: 0 1rem; color: #222; }
+    table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+    td, th { text-align: left; padding: .6rem; border-bottom: 1px solid #ddd; }
+    button { padding: .6rem 1.2rem; font: inherit; cursor: pointer; margin-top: .5rem; }
+    input { font: inherit; padding: .5rem; font-size: 1.4rem; letter-spacing: .3rem; width: 11rem; text-align: center; }
+    .erro { color: #b00020; }
+    .ok { color: #1b5e20; }
+    small { color: #555; }
+    #etapa2 { display: none; margin-top: 1.5rem; }
+    #resultado { display: none; }
+  </style>
+</head>
+<body>
+  <h1 id="titulo">Seu resultado</h1>
+  <p><small>Guarde esta página nos favoritos. Para ver o resultado, você precisa do código enviado ao seu WhatsApp.</small></p>
+
+  <div id="etapa1">
+    <button id="btnEnviar">Enviar código pelo WhatsApp</button>
+  </div>
+
+  <div id="etapa2">
+    <p id="infoEnvio" class="ok"></p>
+    <label>Código de 6 dígitos<br>
+      <input id="codigo" inputmode="numeric" autocomplete="one-time-code" maxlength="6">
+    </label><br>
+    <button id="btnVer">Ver resultado</button>
+    <button id="btnReenviar" type="button">Reenviar código</button>
+  </div>
+
+  <p id="msg" class="erro"></p>
+
+  <div id="resultado">
+    <div id="res"></div>
+  </div>
+
+  <script>
+    const token = new URLSearchParams(location.hash.slice(1)).get('t');
+    const $ = (id) => document.getElementById(id);
+    const msg = $('msg');
+
+    async function api(caminho, corpo) {
+      const resp = await fetch(caminho, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(corpo),
+      });
+      const dados = await resp.json();
+      return { ok: resp.ok, dados };
+    }
+
+    async function enviar() {
+      msg.textContent = '';
+      $('btnEnviar').disabled = true;
+      const { ok, dados } = await api('/api/codigo-enviar', { token });
+      $('btnEnviar').disabled = false;
+      if (!ok) {
+        msg.textContent = dados.erro;
+        return;
+      }
+      $('etapa1').style.display = 'none';
+      $('etapa2').style.display = 'block';
+      $('infoEnvio').textContent = dados.mensagem;
+      $('codigo').focus();
+    }
+
+    async function ver() {
+      msg.textContent = '';
+      const codigo = $('codigo').value.trim();
+      const { ok, dados } = await api('/api/revelar', { token, codigo });
+      if (!ok) {
+        msg.textContent = dados.erro;
+        return;
+      }
+
+      $('etapa2').style.display = 'none';
+      $('titulo').textContent = dados.titulo + ' — ' + dados.unidade;
+
+      const tabela = document.createElement('table');
+      const cab = document.createElement('tr');
+      for (const t of ['Quem', 'Tirou']) {
+        const th = document.createElement('th');
+        th.textContent = t;
+        cab.append(th);
+      }
+      tabela.append(cab);
+
+      for (const r of dados.resultados) {
+        const tr = document.createElement('tr');
+        const td1 = document.createElement('td');
+        td1.textContent = r.quem;
+        const td2 = document.createElement('td');
+        td2.textContent = r.tirou;
+        tr.append(td1, td2);
+        tabela.append(tr);
+      }
+      $('res').textContent = '';
+      $('res').append(tabela);
+      $('resultado').style.display = 'block';
+    }
+
+    if (!token) {
+      msg.textContent = 'Link incompleto.';
+      $('etapa1').style.display = 'none';
+    }
+    $('btnEnviar').addEventListener('click', enviar);
+    $('btnReenviar').addEventListener('click', enviar);
+    $('btnVer').addEventListener('click', ver);
+    $('codigo').addEventListener('keydown', (e) => { if (e.key === 'Enter') ver(); });
+  </script>
+</body>
+</html>

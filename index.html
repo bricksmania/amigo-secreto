@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Criar amigo secreto</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 640px; margin: 2rem auto; padding: 0 1rem; color: #222; }
+    textarea { width: 100%; min-height: 140px; font: inherit; box-sizing: border-box; }
+    input { width: 100%; font: inherit; padding: .4rem; box-sizing: border-box; }
+    label { display: block; margin-bottom: 1rem; }
+    button { padding: .6rem 1.2rem; font: inherit; cursor: pointer; }
+    .erro { color: #b00020; }
+    .box { background: #f4f4f4; padding: 1rem; border-radius: 8px; word-break: break-all; margin-top: 1rem; }
+    small { color: #555; }
+  </style>
+</head>
+<body>
+  <h1>Criar amigo secreto</h1>
+
+  <form id="form">
+    <label>
+      Título
+      <input id="titulo" value="Amigo secreto">
+    </label>
+
+    <label>
+      Participantes (um por linha): <code>Nome | WhatsApp com DDI : Dependente1, Dependente2</code>
+      <small>Ex.: Arlete | 5511999999999 : Joao, Maria. Dependentes não precisam de WhatsApp; o código vai para o responsável.</small>
+      <textarea id="pessoas" placeholder="Arlete | 5511999999999 : Joao, Maria&#10;Carlos | 5511988888888&#10;Ana | 5511977777777"></textarea>
+    </label>
+
+    <label>
+      Exclusões (um par por linha; os dois não se tiram).
+      <small>Ex.: Carlos - Ana</small>
+      <textarea id="proibidos" placeholder="Carlos - Ana"></textarea>
+    </label>
+
+    <button type="submit">Criar sorteio</button>
+  </form>
+
+  <div id="resultado"></div>
+
+  <script>
+    const linhas = (t) => t.split('\n').map((l) => l.trim()).filter(Boolean);
+
+    document.getElementById('form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const saida = document.getElementById('resultado');
+      saida.textContent = 'Criando...';
+      saida.className = '';
+
+      const pessoas = linhas(document.getElementById('pessoas').value).map((l) => {
+        const [parteA, dep = ''] = l.split(':');
+        const [nome, whatsapp = ''] = parteA.split('|');
+        return {
+          nome: (nome || '').trim(),
+          whatsapp: whatsapp.trim(),
+          dependentes: dep.split(',').map((s) => s.trim()).filter(Boolean),
+        };
+      });
+
+      const proibidos = linhas(document.getElementById('proibidos').value)
+        .map((l) => l.split('-').map((s) => s.trim()))
+        .filter((p) => p.length === 2 && p[0] && p[1]);
+
+      try {
+        const resp = await fetch('/api/criar', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            titulo: document.getElementById('titulo').value,
+            pessoas,
+            proibidos,
+          }),
+        });
+        const dados = await resp.json();
+        if (!resp.ok) {
+          saida.className = 'erro';
+          saida.textContent = dados.erro;
+          return;
+        }
+
+        const link = location.origin + dados.link;
+        saida.textContent = '';
+        const box = document.createElement('div');
+        box.className = 'box';
+        const a = document.createElement('a');
+        a.href = link;
+        a.textContent = link;
+        box.append('Envie este link para os participantes:', document.createElement('br'), a);
+        saida.append(box);
+      } catch (err) {
+        saida.className = 'erro';
+        saida.textContent = 'Erro de conexão. Tente de novo.';
+      }
+    });
+  </script>
+</body>
+</html>
