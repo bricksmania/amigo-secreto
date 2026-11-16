@@ -3,96 +3,237 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Escolha seu nome</title>
+  <title>Amigo secreto</title>
   <style>
     * { box-sizing: border-box; }
     body { font-family: system-ui, sans-serif; max-width: 640px; margin: 2rem auto; padding: 0 1rem; color: #222; }
     button { min-height: 44px; font: inherit; font-size: 16px; padding: .6rem 1.2rem; cursor: pointer; }
     .pessoa { display: block; width: 100%; text-align: left; padding: .8rem 1rem; margin: .5rem 0; font: inherit; font-size: 16px; min-height: 48px; overflow-wrap: anywhere; border: 1px solid #ccc; border-radius: 8px; background: #fff; cursor: pointer; }
     .pessoa.dependente { margin-left: 1.5rem; width: calc(100% - 1.5rem); font-size: 15px; }
-    .pessoa.escolhida { background: #f2f2f2; border-color: #bbb; }
+    .pessoa:disabled { background: #f2f2f2; color: #666; cursor: default; }
+    .pessoa.minha { border: 2px solid #1b5e20; }
     .check { color: #1b5e20; font-weight: bold; display: block; margin-top: .3rem; font-size: 14px; }
-    .grupo { margin-top: 1rem; }
+    .grupo { margin-top: .8rem; }
     .erro { color: #b00020; }
     small { color: #555; }
     input { font: inherit; font-size: 20px; padding: .5rem; width: 9rem; max-width: 100%; letter-spacing: .4rem; text-align: center; }
     label { display: block; margin-bottom: .8rem; }
+    .overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, .55); display: flex; align-items: center; justify-content: center; padding: 1rem; z-index: 10; }
+    .modal { background: #fff; padding: 1.2rem 1.3rem; border-radius: 12px; max-width: 420px; width: 100%; max-height: 90vh; overflow: auto; }
+    .modal ol { padding-left: 1.2rem; line-height: 1.5; }
     .resultado { background: #f1f8f1; border-radius: 10px; padding: 1rem 1.2rem; margin-top: 1rem; }
     .resultado .tirou { font-size: 1.3rem; font-weight: bold; color: #1b5e20; }
-    #tela { display: none; }
+    .oculto { display: none !important; }
     @media (max-width: 480px) { h1 { font-size: 1.5rem; } body { margin: 1rem auto; } }
   </style>
 </head>
 <body>
   <h1 id="titulo">Carregando...</h1>
+  <p id="msg" class="erro"></p>
 
-  <!-- Lista de nomes -->
-  <div id="areaLista">
-    <p>Toque no seu nome. Na primeira vez, você cria um PIN. Depois, para ver o resultado, toque no seu nome de novo e digite o PIN.</p>
-    <p><small>Quem tem dependentes: os dependentes aparecem logo abaixo do responsável e usam o mesmo PIN da família.</small></p>
-    <div id="lista"></div>
-    <p id="msg" class="erro"></p>
+  <!-- 1. Como funciona: aparece em toda visita ou atualização -->
+  <div id="sTutorial" class="overlay">
+    <div class="modal" role="dialog" aria-modal="true">
+      <h2>Como funciona</h2>
+      <ol>
+        <li>Selecione quem você é na lista.</li>
+        <li>Crie seu PIN (ou digite o PIN, se sua família já tiver um).</li>
+        <li>Depois, veja quem já escolheu e escolha o seu nome.</li>
+        <li>Para ver o seu resultado, selecione seu nome e digite o PIN.</li>
+      </ol>
+      <p><small>Cada pessoa só pode ser escolhida uma vez. Ninguém vê o resultado de outra pessoa.</small></p>
+      <button id="btnTutorial" class="principal" type="button">Entendi, continuar</button>
+    </div>
   </div>
 
-  <!-- PIN e resultado, dentro da página -->
-  <div id="tela">
-    <h2 id="telaNome"></h2>
-    <div id="telaPin">
-      <label id="telaPinRotulo">Digite seu PIN
-        <br><input id="pinVer" inputmode="numeric" maxlength="4" type="password" autocomplete="off">
-      </label>
-      <button id="btnVer" type="button">Ver resultado</button>
-      <p id="erroVer" class="erro"></p>
+  <!-- 2. Quem é você -->
+  <div id="sQuem" class="oculto">
+    <h2>Quem é você?</h2>
+    <p>Selecione seu nome na lista.</p>
+    <div id="listaQuem"></div>
+  </div>
+
+  <!-- 3. PIN -->
+  <div id="sPin" class="oculto">
+    <h2 id="pinTitulo"></h2>
+    <p id="pinExplica"></p>
+    <label id="pinRotulo">PIN de 4 dígitos
+      <br><input id="pinEntra" inputmode="numeric" maxlength="4" type="password" autocomplete="off">
+    </label>
+    <label id="pinConfirmaBloco" class="oculto">Digite o PIN de novo
+      <br><input id="pinConfirma" inputmode="numeric" maxlength="4" type="password" autocomplete="off">
+    </label>
+    <p><button id="btnPin" class="principal" type="button"></button>
+      <button id="btnVoltarQuem" type="button">Voltar</button></p>
+    <p id="erroPin" class="erro"></p>
+  </div>
+
+  <!-- 4. Aviso de dependentes, depois de criar o PIN -->
+  <div id="sAviso" class="overlay oculto">
+    <div class="modal" role="dialog" aria-modal="true">
+      <h2>PIN criado</h2>
+      <p id="avisoTexto"></p>
+      <button id="btnAviso" class="principal" type="button">Entendi</button>
     </div>
-    <div id="telaResultado" style="display:none">
-      <div class="resultado">
-        <p id="resQuem"></p>
-        <p class="tirou" id="resTirou"></p>
-      </div>
-      <p><small>Você só vê o seu resultado. Ninguém consegue ver o resultado de outra pessoa.</small></p>
+  </div>
+
+  <!-- 5. Sessão: lista do sorteio -->
+  <div id="sSessao" class="oculto">
+    <p>Você está como <strong id="quemNome"></strong>. <button id="btnSair" type="button">Sair</button></p>
+    <p>Toque no seu nome (e dos seus dependentes) para escolher ou ver seu resultado. Os outros nomes mostram só quem já escolheu.</p>
+    <div id="lista"></div>
+    <p id="msgSessao" class="erro"></p>
+  </div>
+
+  <!-- 6. Resultado -->
+  <div id="sResultado" class="oculto">
+    <h2 id="resNome"></h2>
+    <div class="resultado">
+      <p>Você tirou:</p>
+      <p class="tirou" id="resTirou"></p>
     </div>
-    <p><button id="btnVoltar" type="button">Voltar à lista</button></p>
+    <p><small>Você só vê o seu resultado.</small></p>
+    <p><button id="btnVoltarLista" type="button">Voltar à lista</button></p>
   </div>
 
   <script>
     const id = new URLSearchParams(location.search).get('id');
-    const msg = document.getElementById('msg');
     const $ = (x) => document.getElementById(x);
 
     let pessoas = [];
     let tituloEvento = '';
+    let quem = null;      // pessoa escolhida como "eu" nesta visita
+    let pinSessao = null; // PIN digitado/criado nesta visita (não é guardado no aparelho)
+    let modoPin = null;   // 'criar' ou 'entrar'
 
-    function mostrarLista() {
-      $('tela').style.display = 'none';
-      $('areaLista').style.display = 'block';
-      $('erroVer').textContent = '';
-      $('pinVer').value = '';
-      carregar();
-    }
+    const oculte = (el) => el.classList.add('oculto');
+    const mostre = (el) => el.classList.remove('oculto');
 
-    function mostrarTela(nome) {
-      $('areaLista').style.display = 'none';
-      $('tela').style.display = 'block';
-      $('telaNome').textContent = nome;
-      $('telaResultado').style.display = 'none';
-      $('telaPin').style.display = 'block';
-      $('erroVer').textContent = '';
-      $('pinVer').value = '';
+    // Mostra apenas uma das telas principais.
+    function telaAtiva(tela) {
+      for (const t of ['sTutorial', 'sQuem', 'sPin', 'sSessao', 'sResultado']) oculte($(t));
+      mostre($(tela));
       window.scrollTo(0, 0);
     }
 
-    function mostrarResultado(nome, tirou) {
-      $('telaPin').style.display = 'none';
-      $('telaResultado').style.display = 'block';
-      $('resQuem').textContent = `${nome}, você tirou:`;
-      $('resTirou').textContent = tirou;
+    function minhaFamilia() {
+      return pessoas.filter((p) => quem && p.grupo === quem.grupo);
     }
 
-    function desenhar() {
-      $('titulo').textContent = tituloEvento;
+    // Lista para escolher quem é você.
+    function desenharQuem() {
+      const lista = $('listaQuem');
+      lista.textContent = '';
+      const grupos = new Map();
+      for (const p of pessoas) {
+        if (!grupos.has(p.grupo)) grupos.set(p.grupo, []);
+        grupos.get(p.grupo).push(p);
+      }
+      for (const membros of grupos.values()) {
+        const bloco = document.createElement('div');
+        bloco.className = 'grupo';
+        for (const p of membros) {
+          const b = document.createElement('button');
+          b.className = 'pessoa' + (p.dependente ? ' dependente' : '');
+          b.textContent = (p.dependente ? '↳ ' : '') + p.nome;
+          b.addEventListener('click', () => escolherQuem(p));
+          bloco.append(b);
+        }
+        lista.append(bloco);
+      }
+    }
+
+    function escolherQuem(p) {
+      quem = p;
+      $('erroPin').textContent = '';
+      $('pinEntra').value = '';
+      $('pinConfirma').value = '';
+      modoPin = p.temPin ? 'entrar' : 'criar';
+
+      if (modoPin === 'entrar') {
+        $('pinTitulo').textContent = p.familia
+          ? `Digite o PIN da família`
+          : `Digite seu PIN`;
+        $('pinExplica').textContent = `Você está como ${p.nome}.`;
+        $('btnPin').textContent = 'Entrar';
+        oculte($('pinConfirmaBloco'));
+      } else {
+        $('pinTitulo').textContent = p.familia
+          ? `Crie o PIN da família`
+          : `Crie seu PIN`;
+        $('pinExplica').textContent = p.familia
+          ? `Você está como ${p.nome}. Este PIN vale para toda a família: você e seus dependentes.`
+          : `Você está como ${p.nome}.`;
+        $('btnPin').textContent = 'Criar PIN';
+        mostre($('pinConfirmaBloco'));
+      }
+      telaAtiva('sPin');
+      $('pinEntra').focus();
+    }
+
+    async function confirmarPin() {
+      $('erroPin').textContent = '';
+      const pin = $('pinEntra').value.trim();
+      if (!/^\d{4}$/.test(pin)) {
+        $('erroPin').textContent = 'O PIN precisa ter exatamente 4 dígitos.';
+        return;
+      }
+      if (modoPin === 'criar' && $('pinConfirma').value.trim() !== pin) {
+        $('erroPin').textContent = 'Os PINs não batem.';
+        return;
+      }
+
+      const resp = await fetch('/api/pin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, membro: quem.id, pin }),
+      });
+      const dados = await resp.json();
+      if (!resp.ok) {
+        $('erroPin').textContent = dados.erro;
+        return;
+      }
+
+      pinSessao = pin;
+      const familia = minhaFamilia();
+      const dependentes = familia.filter((p) => p.dependente);
+      if (dados.criou && quem.familia) {
+        mostrarAviso(dependentes);
+      } else {
+        abrirSessao();
+      }
+    }
+
+    // Aviso depois de criar o PIN: explica quem são os dependentes.
+    function mostrarAviso(dependentes) {
+      let texto;
+      if (quem.dependente) {
+        texto = `Você faz parte da família de ${quem.responsavel}. Vocês usam este mesmo PIN para ver os resultados.`;
+      } else {
+        const nomes = dependentes.map((d) => d.nome);
+        const lista = nomes.length === 1 ? nomes[0] : nomes.slice(0, -1).join(', ') + ' e ' + nomes[nomes.length - 1];
+        texto = `Você tem ${nomes.length} dependente${nomes.length > 1 ? 's' : ''}: ${lista}. ` +
+          `Você pode escolher o nome ${nomes.length > 1 ? 'de cada um deles' : 'dele(a)'} e ver ${nomes.length > 1 ? 'os resultados' : 'o resultado'} com este mesmo PIN que você acabou de criar.`;
+      }
+      $('avisoTexto').textContent = texto;
+      mostre($('sAviso'));
+    }
+
+    $('btnAviso').addEventListener('click', () => {
+      oculte($('sAviso'));
+      abrirSessao();
+    });
+
+    function abrirSessao() {
+      $('quemNome').textContent = quem.nome;
+      $('msgSessao').textContent = '';
+      telaAtiva('sSessao');
+      carregar().then(desenharSessao);
+    }
+
+    function desenharSessao() {
       const lista = $('lista');
       lista.textContent = '';
-
       const escolheram = pessoas.filter((p) => p.reservado).length;
       const resumo = document.createElement('p');
       resumo.textContent = `${escolheram} de ${pessoas.length} já escolheram.`;
@@ -108,17 +249,32 @@
         const bloco = document.createElement('div');
         bloco.className = 'grupo';
         for (const p of membros) {
+          const minha = quem && p.grupo === quem.grupo;
           const b = document.createElement('button');
-          b.className = 'pessoa' + (p.dependente ? ' dependente' : '') + (p.reservado ? ' escolhida' : '');
+          b.className = 'pessoa' + (p.dependente ? ' dependente' : '') + (minha ? ' minha' : '');
           b.textContent = (p.dependente ? '↳ ' : '') + p.nome;
-          if (p.reservado) {
-            const check = document.createElement('span');
-            check.className = 'check';
-            check.textContent = '✔ já escolheu · toque para ver o resultado';
-            b.append(check);
-            b.addEventListener('click', () => abrirVer(p));
-          } else {
+
+          if (minha && p.reservado) {
+            const c = document.createElement('span');
+            c.className = 'check';
+            c.textContent = '✔ já escolheu · toque para ver o resultado';
+            b.append(c);
+            b.addEventListener('click', () => verResultado(p));
+          } else if (minha && !p.reservado) {
+            const c = document.createElement('span');
+            c.className = 'check';
+            c.style.color = '#555';
+            c.textContent = 'toque para escolher';
+            b.append(c);
             b.addEventListener('click', () => escolher(p));
+          } else {
+            // Outras famílias: só mostram se já escolheram.
+            b.disabled = true;
+            const c = document.createElement('span');
+            c.className = 'check';
+            c.style.color = p.reservado ? '#1b5e20' : '#555';
+            c.textContent = p.reservado ? '✔ já escolheu' : 'ainda não escolheu';
+            b.append(c);
           }
           bloco.append(b);
         }
@@ -126,102 +282,77 @@
       }
     }
 
-    // Toque em quem ainda não escolheu: confirma e cria (ou digita) o PIN.
-    async function escolher(pessoa) {
-      if (!confirm(`Confirmar escolha de "${pessoa.nome}"? Não será possível trocar.`)) return;
-
-      let pin;
-      if (pessoa.temPin) {
-        const rotulo = pessoa.familia ? 'o PIN da família' : 'o seu PIN';
-        const digitado = prompt(`Digite ${rotulo} para escolher "${pessoa.nome}".`);
-        if (digitado === null) return;
-        pin = digitado.trim();
-        if (!/^\d{4}$/.test(pin)) return alert('O PIN precisa ter exatamente 4 dígitos.');
-      } else {
-        const rotulo = pessoa.familia
-          ? 'Crie o PIN da família (4 dígitos). Os outros da família usarão este mesmo PIN.'
-          : 'Crie seu PIN de 4 dígitos.';
-        const criado = prompt(rotulo);
-        if (criado === null) return;
-        pin = criado.trim();
-        if (!/^\d{4}$/.test(pin)) return alert('O PIN precisa ter exatamente 4 dígitos.');
-        const repetido = prompt('Digite o PIN de novo para confirmar.');
-        if (repetido === null) return;
-        if (repetido.trim() !== pin) return alert('Os PINs não batem. Tente de novo.');
-      }
-      await reservar(pessoa, pin);
-    }
-
-    async function reservar(pessoa, pin) {
-      msg.textContent = '';
+    async function escolher(p) {
+      if (!confirm(`Confirmar escolha de "${p.nome}"? Não será possível trocar.`)) return;
+      $('msgSessao').textContent = '';
       const resp = await fetch('/api/pegar', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id, membro: pessoa.id, pin }),
+        body: JSON.stringify({ id, membro: p.id, pin: pinSessao }),
       });
       const dados = await resp.json();
       if (!resp.ok) {
-        msg.textContent = dados.erro;
+        $('msgSessao').textContent = dados.erro;
         await carregar();
+        desenharSessao();
         return;
       }
-      await abrirResultadoComPin(pessoa, pin);
+      await verResultado(p);
     }
 
-    // Toque em quem já escolheu: abre a tela para digitar o PIN.
-    function abrirVer(pessoa) {
-      mostrarTela(pessoa.nome);
-      $('telaPinRotulo').firstChild.textContent = pessoa.familia
-        ? `Digite o PIN da família para ver o resultado de ${pessoa.nome}`
-        : 'Digite seu PIN para ver seu resultado';
-      $('btnVer').onclick = () => verComPin(pessoa, $('pinVer').value.trim());
-      $('pinVer').focus();
-    }
-
-    async function verComPin(pessoa, pin) {
-      $('erroVer').textContent = '';
-      if (!/^\d{4}$/.test(pin)) {
-        $('erroVer').textContent = 'Informe o PIN de 4 dígitos.';
-        return;
-      }
-      await abrirResultadoComPin(pessoa, pin);
-    }
-
-    async function abrirResultadoComPin(pessoa, pin) {
-      mostrarTela(pessoa.nome);
+    async function verResultado(p) {
       const resp = await fetch('/api/ver', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id, membro: pessoa.id, pin }),
+        body: JSON.stringify({ id, membro: p.id, pin: pinSessao }),
       });
       const dados = await resp.json();
       if (!resp.ok) {
-        $('erroVer').textContent = dados.erro;
-        $('pinVer').value = '';
+        $('msgSessao').textContent = dados.erro;
         return;
       }
-      mostrarResultado(pessoa.nome, dados.tirou);
+      $('resNome').textContent = p.nome;
+      $('resTirou').textContent = dados.tirou;
+      telaAtiva('sResultado');
     }
 
-    $('btnVoltar').addEventListener('click', mostrarLista);
+    $('btnVoltarLista').addEventListener('click', async () => {
+      await carregar();
+      telaAtiva('sSessao');
+      desenharSessao();
+    });
+
+    $('btnTutorial').addEventListener('click', () => {
+      telaAtiva('sQuem');
+      desenharQuem();
+    });
+
+    $('btnPin').addEventListener('click', confirmarPin);
+    $('pinEntra').addEventListener('keydown', (e) => { if (e.key === 'Enter') confirmarPin(); });
+    $('btnVoltarQuem').addEventListener('click', () => {
+      telaAtiva('sQuem');
+      desenharQuem();
+    });
+    $('btnSair').addEventListener('click', () => location.reload());
 
     async function carregar() {
       if (!id) {
-        msg.textContent = 'Link sem identificação do sorteio.';
+        $('msg').textContent = 'Link sem identificação do sorteio.';
         return;
       }
       const resp = await fetch('/api/evento?id=' + encodeURIComponent(id));
       const dados = await resp.json();
       if (!resp.ok) {
-        msg.textContent = dados.erro;
+        $('msg').textContent = dados.erro;
         return;
       }
       tituloEvento = dados.titulo;
       pessoas = dados.pessoas;
-      desenhar();
+      $('titulo').textContent = tituloEvento;
     }
 
-    carregar();
+    // Toda visita ou atualização começa pelo "Como funciona".
+    carregar().then(() => telaAtiva('sTutorial'));
   </script>
 </body>
 </html>
