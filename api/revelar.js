@@ -1,46 +1,44 @@
 import { cmd } from '../lib/redis.js';
 import { codigoConfere } from '../lib/codigo.js';
 
-const MAX_TENTATIVAS = 5;
-const VALIDADE_S = 600;
+const MAX_ERRADAS = 5;
+const BLOQUEIO_S = 3600; // 1 hora
 
-// POST /api/revelar   body: { token, codigo }
-// Só mostra o resultado depois de conferir o código enviado ao WhatsApp da unidade.
+// POST /api/revelar   body: { token, pin }
+// Mostra o resultado da unidade depois de conferir o PIN. Bloqueia por 1 hora após 5 erros.
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ erro: 'Método não permitido.' });
 
   try {
     const body = typeof req.body === 'string' ? JSON.parse(req.body) : (req.body || {});
     const token = String(body.token || '');
-    const codigo = String(body.codigo || '').replace(/\s/g, '');
+    const pin = String(body.pin || '');
 
     const ref = token ? await cmd('GET', `tok:${token}`) : null;
     if (!ref) return res.status(404).json({ erro: 'Link inválido.' });
 
-    if (!/^\d{6}$/.test(codigo)) {
-      return res.status(400).json({ erro: 'Informe o código de 6 dígitos.' });
+    const bloqueado = await cmd('GET', `bloq:${token}`);
+    if (bloqueado) {
+      return res.status(429).json({ erro: 'Acesso bloqueado por 1 hora por excesso de tentativas.' });
     }
 
-    const guardado = await cmd('GET', `codigo:${token}`);
-    if (!guardado) {
-      return res.status(400).json({ erro: 'Código expirado ou não solicitado. Peça um novo.' });
+    if (!/^\d{4}$/.test(pin)) {
+      return res.status(400).json({ erro: 'Informe o PIN de 4 dígitos.' });
     }
 
-    // Conta tentativas erradas e invalida o código depois de MAX_TENTATIVAS.
-    const tentativas = await cmd('INCR', `tent:${token}`);
-    if (tentativas === 1) await cmd('EXPIRE', `tent:${token}`, VALIDADE_S);
-    if (tentativas > MAX_TENTATIVAS) {
-      await cmd('DEL', `codigo:${token}`);
-      return res.status(429).json({ erro: 'Muitas tentativas. Peça um novo código.' });
+    const guardado = await cmd('GET', `pin:${token}`);
+    if (!guardado || !codigoConfere(token, pin, guardado)) {
+      const erradas = await cmd('INCR', `erros:${token}`);
+      if (erradas === 1) await cmd('EXPIRE', `erros:${token}`, BLOQUEIO_S);
+      if (erradas >= MAX_ERRADAS) {
+        await cmd('SET', `bloq:${token}`, '1', 'EX', BLOQUEIO_S);
+        await cmd('DEL', `erros:${token}`);
+        return res.status(429).json({ erro: 'Acesso bloqueado por 1 hora por excesso de tentativas.' });
+      }
+      return res.status(401).json({ erro: `PIN incorreto. Restam ${MAX_ERRADAS - erradas} tentativas.` });
     }
 
-    if (!codigoConfere(token, codigo, guardado)) {
-      return res.status(401).json({ erro: 'Código incorreto.' });
-    }
-
-    // Código usado: não pode ser reaproveitado.
-    await cmd('DEL', `codigo:${token}`);
-    await cmd('DEL', `tent:${token}`);
+    await cmd('DEL', `erros:${token}`);
 
     const [id, uid] = ref.split('|');
     const raw = await cmd('GET', `ev:${id}`);

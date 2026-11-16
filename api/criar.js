@@ -5,8 +5,8 @@ import { sortear } from '../lib/sorteio.js';
 const limpa = (s) => String(s ?? '').replace(/\s+/g, ' ').trim().slice(0, 80);
 
 // POST /api/criar
-// body: { titulo, pessoas: [{ nome, whatsapp, dependentes: [nome, ...] }], proibidos: [[a, b], ...] }
-// whatsapp: número com DDI, ex.: 5511999999999 (recebe o código de acesso)
+// body: { titulo, pessoas: [{ nome, dependentes: [nome, ...] }], proibidos: [[a, b], ...] }
+// Retorna o link do evento (participantes e acompanhamento ficam nessa mesma página).
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ erro: 'Método não permitido.' });
 
@@ -25,14 +25,10 @@ export default async function handler(req, res) {
       const uid = `u${i}`;
       const nome = limpa(p.nome);
       if (!nome) throw new Error('Há uma pessoa sem nome.');
-      const whatsapp = String(p.whatsapp || '').replace(/\D/g, '');
-      if (!/^\d{10,15}$/.test(whatsapp)) {
-        throw new Error(`WhatsApp inválido para "${nome}". Use o número com DDI, ex.: 5511999999999.`);
-      }
       const dependentes = (Array.isArray(p.dependentes) ? p.dependentes : [])
         .map(limpa)
         .filter(Boolean);
-      unidades.push({ id: uid, nome, whatsapp, dependentes });
+      unidades.push({ id: uid, nome, dependentes });
       for (const n of [nome, ...dependentes]) {
         givers.push({ id: `g${givers.length}`, nome: n, unidade: uid });
       }

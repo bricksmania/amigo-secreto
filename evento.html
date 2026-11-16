@@ -8,13 +8,14 @@
     body { font-family: system-ui, sans-serif; max-width: 640px; margin: 2rem auto; padding: 0 1rem; color: #222; }
     .unidade { display: block; width: 100%; text-align: left; padding: .8rem 1rem; margin: .5rem 0; font: inherit; border: 1px solid #ccc; border-radius: 8px; background: #fff; cursor: pointer; }
     .unidade:disabled { background: #eee; color: #888; cursor: not-allowed; }
+    .check { color: #1b5e20; font-weight: bold; float: right; }
     .erro { color: #b00020; }
     small { color: #555; }
   </style>
 </head>
 <body>
   <h1 id="titulo">Carregando...</h1>
-  <p>Escolha a unidade que é sua (você e seus dependentes são escolhidos juntos). Cada unidade só pode ser escolhida uma vez. Ao escolher, você vai para a página do seu resultado. <strong>Guarde esse link</strong>: é a única forma de voltar a vê-lo.</p>
+  <p>Escolha a unidade que é sua (você e seus dependentes são escolhidos juntos). Cada unidade só pode ser escolhida uma vez. Ao escolher, você cria um PIN de 4 dígitos e vai para a página do seu resultado. <strong>Guarde o link e o PIN</strong>: sem eles não é possível ver o resultado de novo.</p>
 
   <div id="lista"></div>
   <p id="msg" class="erro"></p>
@@ -28,15 +29,21 @@
       const lista = document.getElementById('lista');
       lista.textContent = '';
 
+      const escolheram = ev.unidades.filter((u) => u.reservado).length;
+      const resumo = document.createElement('p');
+      resumo.textContent = `${escolheram} de ${ev.unidades.length} já escolheram.`;
+      lista.append(resumo);
+
       for (const u of ev.unidades) {
         const b = document.createElement('button');
         b.className = 'unidade';
         b.disabled = u.reservado;
         b.textContent = u.nome + (u.dependentes ? ` (+ ${u.dependentes} dependente${u.dependentes > 1 ? 's' : ''})` : '');
         if (u.reservado) {
-          const s = document.createElement('small');
-          s.textContent = ' — indisponível';
-          b.append(s);
+          const check = document.createElement('span');
+          check.className = 'check';
+          check.textContent = '✔ já escolheu';
+          b.append(check);
         } else {
           b.addEventListener('click', () => escolher(u));
         }
@@ -46,11 +53,25 @@
 
     async function escolher(unidade) {
       if (!confirm(`Confirmar escolha de "${unidade.nome}"? Não será possível trocar.`)) return;
+
+      const pin = prompt('Crie um PIN de 4 dígitos. Você vai precisar dele para ver seu resultado.');
+      if (pin === null) return;
+      if (!/^\d{4}$/.test(pin.trim())) {
+        alert('O PIN precisa ter exatamente 4 dígitos.');
+        return;
+      }
+      const confirmacao = prompt('Digite o PIN novamente para confirmar.');
+      if (confirmacao === null) return;
+      if (confirmacao.trim() !== pin.trim()) {
+        alert('Os PINs não batem. Tente de novo.');
+        return;
+      }
+
       msg.textContent = '';
       const resp = await fetch('/api/pegar', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id, unidade: unidade.id }),
+        body: JSON.stringify({ id, unidade: unidade.id, pin: pin.trim() }),
       });
       const dados = await resp.json();
       if (!resp.ok) {

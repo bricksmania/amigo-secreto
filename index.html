@@ -25,9 +25,9 @@
     </label>
 
     <label>
-      Participantes (um por linha): <code>Nome | WhatsApp com DDI : Dependente1, Dependente2</code>
-      <small>Ex.: Arlete | 5511999999999 : Joao, Maria. Dependentes não precisam de WhatsApp; o código vai para o responsável.</small>
-      <textarea id="pessoas" placeholder="Arlete | 5511999999999 : Joao, Maria&#10;Carlos | 5511988888888&#10;Ana | 5511977777777"></textarea>
+      Participantes (um por linha): <code>Nome : Dependente1, Dependente2</code>
+      <small>Ex.: Arlete : Joao, Maria</small>
+      <textarea id="pessoas" placeholder="Arlete : Joao, Maria&#10;Carlos&#10;Ana"></textarea>
     </label>
 
     <label>
@@ -51,11 +51,9 @@
       saida.className = '';
 
       const pessoas = linhas(document.getElementById('pessoas').value).map((l) => {
-        const [parteA, dep = ''] = l.split(':');
-        const [nome, whatsapp = ''] = parteA.split('|');
+        const [nome, dep = ''] = l.split(':');
         return {
-          nome: (nome || '').trim(),
-          whatsapp: whatsapp.trim(),
+          nome: nome.trim(),
           dependentes: dep.split(',').map((s) => s.trim()).filter(Boolean),
         };
       });
@@ -83,6 +81,7 @@
 
         const link = location.origin + dados.link;
         saida.textContent = '';
+
         const box = document.createElement('div');
         box.className = 'box';
         const a = document.createElement('a');

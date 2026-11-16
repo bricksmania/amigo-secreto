@@ -9,29 +9,22 @@
     table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
     td, th { text-align: left; padding: .6rem; border-bottom: 1px solid #ddd; }
     button { padding: .6rem 1.2rem; font: inherit; cursor: pointer; margin-top: .5rem; }
-    input { font: inherit; padding: .5rem; font-size: 1.4rem; letter-spacing: .3rem; width: 11rem; text-align: center; }
+    input { font: inherit; padding: .5rem; font-size: 1.4rem; letter-spacing: .4rem; width: 9rem; text-align: center; }
     .erro { color: #b00020; }
-    .ok { color: #1b5e20; }
     small { color: #555; }
-    #etapa2 { display: none; margin-top: 1.5rem; }
+    #formulario { margin-top: 1.5rem; }
     #resultado { display: none; }
   </style>
 </head>
 <body>
   <h1 id="titulo">Seu resultado</h1>
-  <p><small>Guarde esta página nos favoritos. Para ver o resultado, você precisa do código enviado ao seu WhatsApp.</small></p>
+  <p><small>Digite o PIN de 4 dígitos que você criou ao escolher sua unidade.</small></p>
 
-  <div id="etapa1">
-    <button id="btnEnviar">Enviar código pelo WhatsApp</button>
-  </div>
-
-  <div id="etapa2">
-    <p id="infoEnvio" class="ok"></p>
-    <label>Código de 6 dígitos<br>
-      <input id="codigo" inputmode="numeric" autocomplete="one-time-code" maxlength="6">
+  <div id="formulario">
+    <label>PIN<br>
+      <input id="pin" inputmode="numeric" autocomplete="off" maxlength="4" type="password">
     </label><br>
     <button id="btnVer">Ver resultado</button>
-    <button id="btnReenviar" type="button">Reenviar código</button>
   </div>
 
   <p id="msg" class="erro"></p>
@@ -45,41 +38,24 @@
     const $ = (id) => document.getElementById(id);
     const msg = $('msg');
 
-    async function api(caminho, corpo) {
-      const resp = await fetch(caminho, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(corpo),
-      });
-      const dados = await resp.json();
-      return { ok: resp.ok, dados };
-    }
-
-    async function enviar() {
-      msg.textContent = '';
-      $('btnEnviar').disabled = true;
-      const { ok, dados } = await api('/api/codigo-enviar', { token });
-      $('btnEnviar').disabled = false;
-      if (!ok) {
-        msg.textContent = dados.erro;
-        return;
-      }
-      $('etapa1').style.display = 'none';
-      $('etapa2').style.display = 'block';
-      $('infoEnvio').textContent = dados.mensagem;
-      $('codigo').focus();
-    }
-
     async function ver() {
       msg.textContent = '';
-      const codigo = $('codigo').value.trim();
-      const { ok, dados } = await api('/api/revelar', { token, codigo });
-      if (!ok) {
+      const pin = $('pin').value.trim();
+      $('btnVer').disabled = true;
+      const resp = await fetch('/api/revelar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token, pin }),
+      });
+      $('btnVer').disabled = false;
+      const dados = await resp.json();
+      if (!resp.ok) {
         msg.textContent = dados.erro;
+        $('pin').value = '';
         return;
       }
 
-      $('etapa2').style.display = 'none';
+      $('formulario').style.display = 'none';
       $('titulo').textContent = dados.titulo + ' — ' + dados.unidade;
 
       const tabela = document.createElement('table');
@@ -107,12 +83,10 @@
 
     if (!token) {
       msg.textContent = 'Link incompleto.';
-      $('etapa1').style.display = 'none';
+      $('formulario').style.display = 'none';
     }
-    $('btnEnviar').addEventListener('click', enviar);
-    $('btnReenviar').addEventListener('click', enviar);
     $('btnVer').addEventListener('click', ver);
-    $('codigo').addEventListener('keydown', (e) => { if (e.key === 'Enter') ver(); });
+    $('pin').addEventListener('keydown', (e) => { if (e.key === 'Enter') ver(); });
   </script>
 </body>
 </html>
