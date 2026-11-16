@@ -18,10 +18,13 @@
 <body>
   <h1>Criar amigo secreto</h1>
 
+  <h2>Meus sorteios (neste aparelho)</h2>
+  <div id="meus"></div>
+
   <form id="form">
     <label>
-      Título
-      <input id="titulo" value="Amigo secreto">
+      Nome do sorteio (obrigatório, para você identificar depois)
+      <input id="titulo" placeholder="Ex.: Amigo oculto 1" required>
     </label>
 
     <label>
@@ -44,9 +47,52 @@
   <script>
     const linhas = (t) => t.split('\n').map((l) => l.trim()).filter(Boolean);
 
+    // Lista dos sorteios criados neste aparelho (fica só no navegador, não no servidor).
+    const CHAVE = 'amigo-secreto-sorteios';
+    function lerLocal() {
+      try { return JSON.parse(localStorage.getItem(CHAVE)) || []; } catch (e) { return []; }
+    }
+    function gravarLocal(lista) {
+      localStorage.setItem(CHAVE, JSON.stringify(lista));
+    }
+    function desenharLista() {
+      const area = document.getElementById('meus');
+      const lista = lerLocal();
+      area.textContent = '';
+      if (lista.length === 0) {
+        area.textContent = 'Nenhum sorteio criado neste aparelho ainda.';
+        return;
+      }
+      for (const item of lista) {
+        const linha = document.createElement('div');
+        linha.className = 'box';
+        const a = document.createElement('a');
+        a.href = item.link;
+        a.textContent = item.titulo;
+        const data = document.createElement('small');
+        data.textContent = ' — ' + new Date(item.criado).toLocaleString('pt-BR');
+        const remover = document.createElement('button');
+        remover.type = 'button';
+        remover.textContent = 'Tirar da lista';
+        remover.style.marginLeft = '.5rem';
+        remover.addEventListener('click', () => {
+          gravarLocal(lerLocal().filter((x) => x.link !== item.link));
+          desenharLista();
+        });
+        linha.append(a, data, remover);
+        area.append(linha);
+      }
+    }
+    desenharLista();
+
     document.getElementById('form').addEventListener('submit', async (e) => {
       e.preventDefault();
       const saida = document.getElementById('resultado');
+      if (!document.getElementById('titulo').value.trim()) {
+        saida.className = 'erro';
+        saida.textContent = 'Dê um nome para o sorteio.';
+        return;
+      }
       saida.textContent = 'Criando...';
       saida.className = '';
 
@@ -80,6 +126,9 @@
         }
 
         const link = location.origin + dados.link;
+        const titulo = document.getElementById('titulo').value.trim();
+        gravarLocal([{ titulo, link, criado: Date.now() }, ...lerLocal()]);
+        desenharLista();
         saida.textContent = '';
 
         const box = document.createElement('div');
