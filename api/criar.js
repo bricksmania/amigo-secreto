@@ -64,6 +64,8 @@ export default async function handler(req, res) {
     const id = randomBytes(6).toString('base64url');
     // Chave para apagar o sorteio: fica só no aparelho de quem criou. O servidor guarda só o hash.
     const chaveApagar = randomBytes(16).toString('base64url');
+    // Segredo do sorteio: os códigos anônimos só podem ser recalculados com ele.
+    const salt = randomBytes(16).toString('hex');
 
     await cmd(
       'SET',
@@ -74,6 +76,7 @@ export default async function handler(req, res) {
         givers,
         pares: sorteio,
         apagarHash: hashCodigo(id, chaveApagar),
+        salt,
       }),
     );
 

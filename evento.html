@@ -24,6 +24,9 @@
     .resultado { background: #f1f8f1; border-radius: 10px; padding: 1rem 1.2rem; margin-top: 1rem; }
     .resultado .tirou { font-size: 1.3rem; font-weight: bold; color: #1b5e20; }
     .oculto { display: none !important; }
+    #verificacao { margin-top: 1.5rem; border-top: 1px solid #ddd; padding-top: .5rem; }
+    .alerta { background: #fdecea; color: #b00020; padding: .8rem; border-radius: 8px; margin-top: .5rem; font-weight: bold; }
+    .ok { color: #1b5e20; font-weight: bold; }
     @media (max-width: 480px) { h1 { font-size: 1.5rem; } body { margin: 1rem auto; } }
   </style>
 </head>
@@ -83,6 +86,7 @@
     <p>Toque no seu nome (e dos seus dependentes) para escolher ou ver seu resultado. Os outros nomes mostram só quem já escolheu.</p>
     <div id="lista"></div>
     <p id="msgSessao" class="erro"></p>
+    <div id="verificacao"></div>
   </div>
 
   <!-- 6. Resultado -->
@@ -105,6 +109,7 @@
     let quem = null;      // pessoa escolhida como "eu" nesta visita
     let pinSessao = null; // PIN digitado/criado nesta visita (não é guardado no aparelho)
     let modoPin = null;   // 'criar' ou 'entrar'
+    let verificacao = null;
 
     const oculte = (el) => el.classList.add('oculto');
     const mostre = (el) => el.classList.remove('oculto');
@@ -231,7 +236,36 @@
       carregar().then(desenharSessao);
     }
 
+    // Verificação no fim do sorteio: códigos anônimos, sem nomes.
+    function desenharVerificacao() {
+      const v = $('verificacao');
+      v.textContent = '';
+      if (!verificacao) return;
+
+      const titulo = document.createElement('h3');
+      titulo.textContent = 'Verificação do sorteio';
+      const texto = document.createElement('p');
+      texto.textContent = `${verificacao.total} participantes. Cada um tem um código próprio, e nenhum código foi sorteado mais de uma vez.`;
+      v.append(titulo);
+
+      if (verificacao.repetidos.length === 0) {
+        texto.textContent = `${verificacao.total} participantes, ${verificacao.unicos} códigos sorteados, todos diferentes.`;
+        const ok = document.createElement('p');
+        ok.className = 'ok';
+        ok.textContent = '✔ Nenhum código foi sorteado mais de uma vez. O sorteio está correto.';
+        v.append(texto, ok);
+      } else {
+        const alerta = document.createElement('div');
+        alerta.className = 'alerta';
+        alerta.textContent = '⚠ Atenção: ' +
+          verificacao.repetidos.map((r) => `o código ${r.codigo} foi sorteado ${r.vezes} vezes`).join('; ') +
+          '. Refaça o sorteio.';
+        v.append(texto, alerta);
+      }
+    }
+
     function desenharSessao() {
+      desenharVerificacao();
       const lista = $('lista');
       lista.textContent = '';
       const escolheram = pessoas.filter((p) => p.reservado).length;
@@ -348,6 +382,7 @@
       }
       tituloEvento = dados.titulo;
       pessoas = dados.pessoas;
+      verificacao = dados.verificacao;
       $('titulo').textContent = tituloEvento;
     }
 
